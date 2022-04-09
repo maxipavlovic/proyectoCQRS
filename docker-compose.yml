@@ -1,0 +1,88 @@
+version: '3'
+
+services:
+
+  mq:
+    image: rabbitmq:latest
+
+  postgres_replica:
+    image: postgres:latest
+    environment:
+      - POSTGRES_HOST=postgres_replica
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=pswd
+      - POSTGRES_DB=replica
+    ports:
+      - "5431:5432"
+    volumes:
+        - replica-data:/var/lib/postgresql/data
+
+  replica:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    command: >
+      bash -c "
+      dockerize -wait tcp://mq:5672 -wait tcp://postgres_replica:5432 -timeout 60s &&
+      cd replica &&  
+      python manage.py makemigrations &&
+      python manage.py migrate &&
+      python manage.py cqrs_consume -w 2
+      "
+    depends_on:
+      - mq
+      - postgres_replica
+    environment:
+      - POSTGRES_HOST=postgres_replica
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=pswd
+      - POSTGRES_DB=replica
+      - POSTGRES_PORT=5432
+      - CQRS_REPLICA_TRANSPORT=dj_cqrs.transport.RabbitMQTransport
+      - CQRS_BROKER_URL=amqp://mq:5672/
+    volumes:
+      - ./replica:/app/replica
+    
+
+  postgres_master:
+    image: postgres:latest
+    environment:
+      - POSTGRES_HOST=postgres_master
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=pswd
+      - POSTGRES_DB=master
+    volumes:
+        - master-data:/var/lib/postgresql/data
+
+  master:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: >
+      bash -c "
+      dockerize -wait tcp://mq:5672 -wait tcp://postgres_master:5432 -timeout 60s &&
+      cd master &&
+      python manage.py makemigrations &&
+      python manage.py migrate &&
+      python manage.py runserver 0.0.0.0:8000
+      "
+    depends_on:
+      - mq
+      - replica
+      - postgres_master
+    environment:
+      - CQRS_BROKER_URL=amqp://mq:5672/
+      - POSTGRES_HOST=postgres_master
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=pswd
+      - POSTGRES_DB=master
+      - POSTGRES_PORT=5432
+    ports:
+      - "9000:8000"
+    volumes:
+      - ./master:/app/master
+
+volumes:
+  master-data:
+  replica-data:

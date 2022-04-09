@@ -77,14 +77,14 @@ WSGI_APPLICATION = 'monitoring.wsgi.application'
 # https://docs.djangoproject.com/en/2.2/ref/settings/#databases
 
 DATABASES = {
-     "default": {
-        "ENGINE": "django.db.backends.postgresql_psycopg2",
-        "NAME": "arquisoftmaster",
-        "USER": "postgres",
-        "PASSWORD": "postgres123",
-        "HOST": "localhost",
-        "PORT": "5432",
-    }
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'HOST': os.getenv('POSTGRES_HOST'),
+        'NAME': os.getenv('POSTGRES_DB'),
+        'USER': os.getenv('POSTGRES_USER'),
+        'PASSWORD': os.getenv('POSTGRES_PASSWORD'),
+        'PORT': os.getenv('POSTGRES_PORT'),
+    },
 }
 
 
@@ -128,5 +128,5 @@ STATIC_URL = '/static/'
 
 CQRS = {
     'transport': 'dj_cqrs.transport.RabbitMQTransport',
-    'url': 'amqp://guest:guest@localhost:5672//',
+    'url': os.getenv('CQRS_BROKER_URL'),
 }
